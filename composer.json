@@ -1,0 +1,20 @@
+{
+    "name": "mageworx/module-disable-cod",
+    "description": "Disable Cash on Delivery payment method programmatically",
+    "require": {
+        "magento/framework"         : ">=100.0.0 < 102",
+        "magento/module-offline-payments"   : ">=100.2.0"
+    },
+    "type": "magento2-module",
+    "version": "1.0.0",
+    "license": [
+        "OSL-3.0",
+        "AFL-3.0"
+    ],
+    "autoload": {
+        "files": [ "registration.php" ],
+        "psr-4": {
+            "MageWorx\\DisableCOD\\": ""
+        }
+    }
+}
