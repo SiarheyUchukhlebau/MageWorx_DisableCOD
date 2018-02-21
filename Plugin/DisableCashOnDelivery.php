@@ -6,45 +6,71 @@
 
 namespace MageWorx\DisableCOD\Plugin;
 
-use Magento\Customer\Model\Session as CustomerSession;
-use Magento\Backend\Model\Auth\Session as BackendSession;
-use Magento\OfflinePayments\Model\Cashondelivery;
+use Magento\Framework\App\State;
+use Magento\Checkout\Model\Session as CheckoutFrontendSession;
+use Magento\Backend\Model\Session\Quote as CheckoutBackendSession;
 
 class DisableCashOnDelivery
 {
     /**
-     * @var CustomerSession
+     * @var CheckoutFrontendSession|CheckoutBackendSession
      */
-    protected $customerSession;
+    protected $session;
 
     /**
-     * @var BackendSession
-     */
-    protected $backendSession;
-
-    /**
-     * @param CustomerSession $customerSession
-     * @param BackendSession $backendSession
+     * @param CheckoutFrontendSession $checkoutFrontendSession
+     * @param CheckoutBackendSession  $checkoutBackendSession
+     * @param State                   $state
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
     public function __construct(
-        CustomerSession $customerSession,
-        BackendSession $backendSession
+        CheckoutFrontendSession $checkoutFrontendSession,
+        CheckoutBackendSession $checkoutBackendSession,
+        State $state
     ) {
-        $this->customerSession = $customerSession;
-        $this->backendSession = $backendSession;
+        /**
+         * Using the area code we detect which session object should we use later to obtain actual quote object.
+         * 
+         * Possible sessions:
+         * \Magento\Checkout\Model\Session for the frontend
+         * \Magento\Backend\Model\Session\Quote for the backend (admin creates new order)
+         */
+        if ($state->getAreaCode() == \Magento\Framework\App\Area::AREA_ADMINHTML) {
+            $this->session = $checkoutBackendSession;
+        } else {
+            $this->session = $checkoutFrontendSession;
+        }
     }
 
     /**
-     *
-     * @param Cashondelivery $subject
-     * @param                $result
+     * @param \Magento\OfflinePayments\Model\Cashondelivery $subject
+     * @param callable                                      $proceed
+     * @param \Magento\Quote\Api\Data\CartInterface|null    $quote
      * @return bool
      */
-    public function afterIsAvailable(Cashondelivery $subject, $result)
-    {
-        $condition = true; // Replace with your condition
+    public function aroundIsAvailable(
+        \Magento\OfflinePayments\Model\Cashondelivery $subject,
+        callable $proceed,
+        \Magento\Quote\Api\Data\CartInterface $quote = null
+    ) {
+        /**
+         * Before doing our advanced validation we call main method
+         */
+        $result = $proceed($quote);
 
-        if ($condition) {
+        /**
+         * The quote can be null on the frontend, in this case we get it from corresponding session
+         * @see \Magento\OfflinePayments\Model\InstructionsConfigProvider::getConfig()
+         */
+        if ($quote === null) {
+            $quote = $this->session->getQuote();
+        }
+
+        /**
+         * Disable Cash on Delivery for the addresses without post code.
+         * Change this condition to desired one.
+         */
+        if (!$quote->getShippingAddress()->getPostcode()) {
             return false;
         }
 
